@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"io"
+	"http_frm_udp/internal/request"
 	"net"
-	"internal/request/request"
 )
 
 func main() {
@@ -22,11 +20,14 @@ func main() {
 			fmt.Println("Unable to get connection")
 		}
 
-		res,err := request.RequestFromReader(conn)
-		if err!=nil{
+		res, err := request.RequestFromReader(conn)
+		if err != nil {
 			fmt.Println("unable to read from parser")
 		}
-		res.
+		fmt.Println("Request Line:")
+		fmt.Println("Method:", res.RequestLine.Method)
+		fmt.Println("Target:", res.RequestLine.RequestTarget)
+		fmt.Println("Version:", res.RequestLine.HttpVersion)
 
 		// for line := range getLinesChannel(conn) { //we can directly send conn to our old method
 		// 	fmt.Println(line)
@@ -35,6 +36,7 @@ func main() {
 	}
 
 }
+
 // func getLinesChannel(f io.ReadCloser) <-chan string { //this return type is called channel of strings
 // 	var s chan string = make(chan string, 1) // create a channel of string with length 1
 // 	go func() {                              // beggining of go routines
