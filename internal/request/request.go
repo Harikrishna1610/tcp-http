@@ -3,6 +3,7 @@ package request
 import (
 	"bytes"
 	"fmt"
+	"http_frm_udp/internal/headers"
 	"io"
 	"strings"
 )
@@ -10,9 +11,11 @@ import (
 type parserState string
 
 const (
-	StateInit  parserState = "init"
-	StateDone  parserState = "done"
-	StateError parserState = "error"
+	StateInit    parserState = "init"
+	StateDone    parserState = "done"
+	StateHeaders parserState = "HeadersState"
+	StateError   parserState = "error"
+	StateBody    parserState = "body"
 )
 
 type RequestLine struct {
@@ -23,6 +26,8 @@ type RequestLine struct {
 
 type Request struct {
 	RequestLine RequestLine
+	Headers     headers.Headers
+	Body        string
 	state       parserState
 }
 
@@ -31,7 +36,7 @@ func (r *RequestLine) validateHTTP() bool {
 }
 
 func GetRequest() *Request {
-	return &Request{state: StateInit}
+	return &Request{state: StateInit, Headers: headers.NewHeaders(), Body: ""}
 }
 
 var MALFORMED_HTTP = fmt.Errorf("Http request is malformed")
@@ -42,11 +47,15 @@ func (r *Request) parse(data []byte) (int, error) {
 	read := 0
 OUTER:
 	for {
+		currentData := data[read:]
+		if len(currentData) == 0 {
+			break
+		}
 		switch r.state {
 		case StateError:
 			return 0, fmt.Errorf("Request in Error State")
 		case StateInit:
-			rl, n, err := ParseRequest(data[read:])
+			rl, n, err := ParseRequest(currentData)
 			if err != nil {
 				return 0, err
 			}
@@ -55,7 +64,33 @@ OUTER:
 			}
 			r.RequestLine = *rl
 			read += n
-			r.state = StateDone
+			r.state = StateHeaders
+		case StateHeaders:
+			n, done, err := r.Headers.Parse(currentData)
+			if err != nil {
+				r.state = StateError
+				return 0, err
+			}
+			if n == 0 {
+				break OUTER
+			}
+			read += n
+			if done {
+				r.state = StateBody
+			}
+		case StateBody:
+			contentLen, _ := r.Headers.GetContentLen()
+
+			if contentLen == 0 {
+				r.state = StateDone
+				break OUTER
+			}
+			remaining := min(contentLen-len(r.Body), len(currentData))
+			r.Body += string(currentData[:remaining])
+			read += remaining
+			if len(r.Body) == contentLen {
+				r.state = StateDone
+			}
 		case StateDone:
 			break OUTER
 		}
@@ -89,8 +124,11 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	var req = GetRequest()
 	for !req.done() {
 		n, err := reader.Read(b[bIdx:])
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
-			fmt.Print("error reading")
+			return req, err
 		}
 		bIdx += n
 		readN, err := req.parse(b[:bIdx])
@@ -100,6 +138,8 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		copy(b, b[readN:bIdx])
 		bIdx -= readN
 	}
-
+	if val, _ := req.Headers.GetContentLen(); val != len(req.Body) {
+		return req, fmt.Errorf("Body Content Incomplete")
+	}
 	return req, nil
 }

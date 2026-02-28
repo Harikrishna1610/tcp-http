@@ -28,7 +28,9 @@ func main() {
 		fmt.Println("Method:", res.RequestLine.Method)
 		fmt.Println("Target:", res.RequestLine.RequestTarget)
 		fmt.Println("Version:", res.RequestLine.HttpVersion)
-
+		for k, v := range res.Headers {
+			fmt.Printf("%s : %s\n", k, v)
+		}
 		// for line := range getLinesChannel(conn) { //we can directly send conn to our old method
 		// 	fmt.Println(line)
 		// }
