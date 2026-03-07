@@ -62,3 +62,7 @@ func (w *Writer) WriteBody(p []byte) (int, error) {
 	n, err := w.Writer.Write(p)
 	return n, err
 }
+
+func (w *Writer) WriteTrailers(h headers.Headers) error {
+	return nil
+}

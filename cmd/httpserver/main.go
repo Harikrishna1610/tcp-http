@@ -1,13 +1,18 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"http_frm_udp/internal/headers"
 	response "http_frm_udp/internal/reponse"
 	"http_frm_udp/internal/request"
 	"http_frm_udp/internal/server"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -51,15 +56,58 @@ func main() {
 		status := response.StatusOkay
 		body := getResponse200()
 		h := response.GetDefaultHeaders(0)
-		switch req.RequestLine.RequestTarget {
-		case "/yourproblem":
+		if req.RequestLine.RequestTarget == "/yourproblem" {
 			status = response.StatusNotFound
 			body = getResponse400()
-			//break
-		case "/myproblem":
+		} else if req.RequestLine.RequestTarget == "/myproblem" {
 			status = response.StatusInternalServerError
 			body = getResponse500()
-			//break
+		} else if req.RequestLine.RequestTarget == "/video" {
+			h["Content-Type"] = ": video/mp4\r\n"
+			w.WriteStatusLine(status)
+			n, err := os.ReadFile("/media/hari/Data/projects/Learning/GOLang/Http/assets/vim.mp4")
+			if err != nil {
+				log.Fatal(err)
+			}
+			h["Content-Length"] = fmt.Sprintf(": %d\r\n", len(n))
+			w.WriteHeaders(h)
+			w.WriteBody(n)
+			return
+
+		} else if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin/") {
+			target := req.RequestLine.RequestTarget
+			res, err := http.Get("https://httpbin.org/" + target[len("/httpbin/"):])
+			if err != nil {
+				status = response.StatusInternalServerError
+				body = getResponse500()
+			} else {
+				h["Transfer-Encoding"] = ": chunked\r\n"
+				h["Content-Type"] = ": text/plain\r\n"
+				delete(h, "Content-Length")
+				h["Trailer"] = ": X-Content-SHA256\r\n"
+				w.WriteStatusLine(status)
+				w.WriteHeaders(h)
+				fullBody := []byte{}
+				for {
+					data := make([]byte, 32)
+					n, err := res.Body.Read(data)
+					if err != nil {
+						break
+					}
+					fullBody = append(fullBody, data[:n]...)
+					w.WriteBody(fmt.Appendf(nil, "%x\r\n", n))
+					w.WriteBody(data[:n])
+					w.WriteBody([]byte("\r\n"))
+				}
+				w.WriteBody([]byte("0\r\n"))
+				trailers := headers.NewHeaders()
+				sum := sha256.Sum256(fullBody)
+				trailers["X-Content-SHA256"] = fmt.Sprintf(": %x\r\n", sum)
+				trailers["X-Content-Length"] = ": " + strconv.Itoa(len(fullBody))
+				w.WriteHeaders(trailers)
+				return
+			}
+
 		}
 		h["Content-Length"] = fmt.Sprintf(": %d\r\n", len(body))
 		h["Content-Type"] = ": text/html\r\n"

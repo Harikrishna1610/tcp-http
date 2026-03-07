@@ -32,3 +32,4 @@ go.work.sum
 # .idea/
 # .vscode/
 .vscode/launch.json
+assets/*
