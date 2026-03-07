@@ -76,7 +76,12 @@ OUTER:
 			}
 			read += n
 			if done {
-				r.state = StateBody
+				contentLen, _ := r.Headers.GetContentLen()
+				if contentLen == 0 {
+					r.state = StateDone
+				} else {
+					r.state = StateBody
+				}
 			}
 		case StateBody:
 			contentLen, _ := r.Headers.GetContentLen()

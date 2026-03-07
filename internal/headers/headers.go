@@ -47,8 +47,8 @@ func NewHeaders() (h Headers) {
 	return make(Headers, 0)
 }
 func (h Headers) GetContentLen() (int, error) {
-	val, ok := h["content-length"]
-	if ok {
+
+	if val, ok := h["content-length"]; ok {
 		i, err := strconv.Atoi(val)
 		if err != nil {
 			return 0, err

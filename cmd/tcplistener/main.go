@@ -31,6 +31,8 @@ func main() {
 		for k, v := range res.Headers {
 			fmt.Printf("%s : %s\n", k, v)
 		}
+		fmt.Println("Body:")
+		fmt.Println(res.Body)
 		// for line := range getLinesChannel(conn) { //we can directly send conn to our old method
 		// 	fmt.Println(line)
 		// }
